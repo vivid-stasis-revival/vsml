@@ -9,9 +9,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vividstasisModLoader", "viv
 		{48783209-6DA9-2C2C-45A2-B407F849FFF4} = {48783209-6DA9-2C2C-45A2-B407F849FFF4}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Underanalyzer", "Underanalyzer\Underanalyzer.csproj", "{48783209-6DA9-2C2C-45A2-B407F849FFF4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Underanalyzer", "UndertaleModTool\Underanalyzer\Underanalyzer\Underanalyzer.csproj", "{48783209-6DA9-2C2C-45A2-B407F849FFF4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UndertaleModLib", "UndertaleModLib\UndertaleModLib.csproj", "{15000979-105C-0227-C069-94076D6D2DCA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UndertaleModLib", "UndertaleModTool\UndertaleModLib\UndertaleModLib.csproj", "{15000979-105C-0227-C069-94076D6D2DCA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

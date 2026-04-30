@@ -120,7 +120,7 @@ public class CodePatcher(UndertaleData data, string modDir)
 
                     // Link to object's event with a blank code entry
                     var manualCode = UndertaleCode.CreateEmptyEntry(data, codeName);
-                    CodeImportGroup.LinkEvent(obj, manualCode, EventType.Collision, eventSubtype);
+                    CodeImportGroup.LinkEvent(obj, manualCode, EventType.Collision, eventSubtype, replaceGroup.MainThreadAction);
                     // Perform code import using manual code entry
                     replaceGroup.QueueReplace(manualCode, code);
                 }
@@ -211,65 +211,173 @@ public class CodePatcher(UndertaleData data, string modDir)
 
     public static string InsertCode(string gmlCode, string functionName, PatchType type, string codeToInsert)
     {
-        // 转义函数名并构建正则模式
-        string pattern = BuildFunctionPattern(functionName);
-
-        Regex functionRegex = new Regex(pattern, RegexOptions.Singleline);
-        Match match = functionRegex.Match(gmlCode);
-
-        if (!match.Success) return gmlCode;// 未找到匹配函数
-
-        int bodyStartIndex = match.Index + match.Groups["body"].Index;
-        int braceIndex = match.Index + match.Length - 1;
-
-        // 找到匹配的结束大括号
-        int bodyEndIndex = FindMatchingBrace(gmlCode, braceIndex);
-        if (bodyEndIndex == -1) return gmlCode;// 函数体不完整
+        if (!TryFindFunctionBounds(gmlCode, functionName, out var openingBraceIndex, out var closingBraceIndex))
+        {
+            return gmlCode;
+        }
 
         // 根据插入位置处理
         switch (type)
         {
             case PatchType.InsertBefore:
-                return InsertAtPosition(gmlCode, bodyStartIndex + 1, codeToInsert + "\n");
+                return InsertAtPosition(gmlCode, openingBraceIndex + 1, codeToInsert + "\n");
             case PatchType.InsertAfter:
-                return InsertAtPosition(gmlCode, bodyEndIndex, "\n" + codeToInsert);
+                return InsertAtPosition(gmlCode, closingBraceIndex, "\n" + codeToInsert);
             default:
                 throw new ArgumentException("Unknown patch type");
         }
     }
 
-    private static string BuildFunctionPattern(string functionName)
+    private static bool TryFindFunctionBounds(string gmlCode, string functionName, out int openingBraceIndex, out int closingBraceIndex)
     {
+        openingBraceIndex = -1;
+        closingBraceIndex = -1;
+
         // 处理带命名空间的函数名 (如: object_name.event_name)
         string namePattern = Regex.Escape(functionName).Replace(@"\.", @"[\.:]");
 
-        // 匹配函数定义:
-        // 1. function 关键字
-        // 2. 函数名 (可能包含命名空间)
-        // 3. 参数列表 (支持多行和嵌套括号)
-        // 4. 函数体开始 {
-        return $@"
-            function\s+             # function 关键字
-            ({namePattern})          # 函数名
-            \s*                     # 可选空白
-            \(                      # 参数列表开始
-            (                        # 捕获参数内容
-                (?:                  # 非捕获组:
-                    [^()]            # 非括号字符
-                    |                # 或
-                    \( (?<depth>)    # 遇到(时增加嵌套计数
-                    |                # 或
-                    \) (?<-depth>)   # 遇到)时减少嵌套计数
-                )+?                 # 非贪婪匹配
-                (?(depth)(?!))      # 确保嵌套平衡
-            )                       # 结束参数捕获
-            \)                      # 参数列表结束
-            [^{{}}]*                # 函数体前的任意字符 (除了大括号)
-            {{                      # 函数体开始 {{
-            (?<body>[^{{}}]*)       # 函数体开始部分 (直到第一个非空字符)
-        ".StripPattern();
+        var functionMatch = Regex.Match(gmlCode, $@"\bfunction\s+{namePattern}\s*\(", RegexOptions.Singleline);
+        if (!functionMatch.Success)
+        {
+            return false;
+        }
+
+        var openParenIndex = gmlCode.IndexOf('(', functionMatch.Index + functionMatch.Length - 1);
+        if (openParenIndex == -1)
+        {
+            return false;
+        }
+
+        var closeParenIndex = FindMatchingParen(gmlCode, openParenIndex);
+        if (closeParenIndex == -1)
+        {
+            return false;
+        }
+
+        var braceIndex = FindOpeningBrace(gmlCode, closeParenIndex + 1);
+        if (braceIndex == -1)
+        {
+            return false;
+        }
+
+        var endBraceIndex = FindMatchingBrace(gmlCode, braceIndex);
+        if (endBraceIndex == -1)
+        {
+            return false;
+        }
+
+        openingBraceIndex = braceIndex;
+        closingBraceIndex = endBraceIndex;
+        return true;
     }
 
+    private static int FindMatchingParen(string code, int startIndex)
+    {
+        int depth = 1;
+        bool inString = false;
+        bool inComment = false;
+        bool escapeNext = false;
+
+        for (int i = startIndex + 1; i < code.Length; i++)
+        {
+            char c = code[i];
+
+            if (escapeNext)
+            {
+                escapeNext = false;
+                continue;
+            }
+
+            if (c == '"' && !inComment)
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString)
+            {
+                if (c == '/' && i < code.Length - 1)
+                {
+                    if (code[i + 1] == '/') inComment = true;
+                    else if (code[i + 1] == '*') inComment = true;
+                }
+                else if (c == '\n' && inComment)
+                {
+                    inComment = false;
+                }
+                else if (c == '*' && i < code.Length - 1 && code[i + 1] == '/')
+                {
+                    inComment = false;
+                    i++;
+                }
+            }
+
+            if (inString || inComment)
+            {
+                if (c == '\\') escapeNext = true;
+                continue;
+            }
+
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+
+            if (depth == 0) return i;
+        }
+
+        return -1;
+    }
+
+    private static int FindOpeningBrace(string code, int startIndex)
+    {
+        bool inString = false;
+        bool inComment = false;
+        bool escapeNext = false;
+
+        for (int i = startIndex; i < code.Length; i++)
+        {
+            char c = code[i];
+
+            if (escapeNext)
+            {
+                escapeNext = false;
+                continue;
+            }
+
+            if (c == '"' && !inComment)
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString)
+            {
+                if (c == '/' && i < code.Length - 1)
+                {
+                    if (code[i + 1] == '/') inComment = true;
+                    else if (code[i + 1] == '*') inComment = true;
+                }
+                else if (c == '\n' && inComment)
+                {
+                    inComment = false;
+                }
+                else if (c == '*' && i < code.Length - 1 && code[i + 1] == '/')
+                {
+                    inComment = false;
+                    i++;
+                }
+            }
+
+            if (inString || inComment)
+            {
+                if (c == '\\') escapeNext = true;
+                continue;
+            }
+
+            if (c == '{') return i;
+        }
+
+        return -1;
+    }
     private static int FindMatchingBrace(string code, int startIndex)
     {
         int depth = 1;

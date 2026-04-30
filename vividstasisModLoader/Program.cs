@@ -4,8 +4,8 @@ using UndertaleModLib;
 using vividstasisModLoader;
 using static vividstasisModLoader.ConsoleOutput;
 
-const string VERSION = "v0.1.0";
-const string CHANGE_LOG = "美化日志输出和停留体验；新增 dry-run 模式，模拟修补流程但不实际修改文件。";
+const string VERSION = "v0.1.1";
+const string CHANGE_LOG = "修正部分路径处理逻辑，增强兼容性。";
 
 // 判断路径中是否包含中文或少量真正危险的特殊字符。
 bool HasUnsafePathCharacters(string path)
