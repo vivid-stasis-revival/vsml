@@ -1,11 +1,14 @@
 ﻿using Microsoft.Win32;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using UndertaleModLib;
 using vividstasisModLoader;
+using vividstasisModLoader.TVOClientCommunicate;
 using static vividstasisModLoader.ConsoleOutput;
 
-const string VERSION = "v0.1.1";
-const string CHANGE_LOG = "修正部分路径处理逻辑，增强兼容性。";
+// 版本以及修改日志移至AppInfo.cs以便于在不同模块统一引用
+// string VERSION = AppInfo.VERSION;
+// string CHANGE_LOG = AppInfo.CHANGE_LOG;
 
 // 判断路径中是否包含中文或少量真正危险的特殊字符。
 bool HasUnsafePathCharacters(string path)
@@ -576,7 +579,20 @@ void PauseAfterPatch(bool dryRun)
 // 统一执行主流程。
 void Run(string[] inputArgs)
 {
-    PrintAppBanner("vividstasis 模组加载器", "vividstasis Mod Loader", VERSION, CHANGE_LOG);
+    // TVOC联动用
+    PipeClient.Init(inputArgs);
+
+    // 防止TVOC联动启动时运行路径被认为是TVOC目录
+    if (PipeClient.IPCMode)
+    {
+        Environment.CurrentDirectory = AppContext.BaseDirectory;
+    }
+    else
+    {
+        PrintAppBanner("vividstasis 模组加载器", "vividstasis Mod Loader", AppInfo.VERSION, AppInfo.CHANGE_LOG);
+    }
+
+    Console.WriteLine($"当前运行目录:{Environment.CurrentDirectory}");
 
     // 启动后先检查当前运行路径，命中中文或特殊字符时直接暂停，避免后续文件操作损坏数据。
     var runPath = Environment.CurrentDirectory;
@@ -601,8 +617,20 @@ void Run(string[] inputArgs)
     CreateRestoreScript(dryRun);
 
     var config = LoadConfig();
-    var gamePath = ResolveGamePath();
+    // IPC模式下直接读取TVOClient传递的游戏目录
+    string gamePath;
+
+    if (PipeClient.IPCMode)
+    {
+        gamePath = PipeClient.GamePath;
+    }
+    else
+    {
+        gamePath = ResolveGamePath();
+    }
+
     config.GamePath = gamePath;
+
     PrintInfo($"游戏路径：{gamePath}", $"Game path: {gamePath}");
 
     var dataFilePath = Path.Combine(gamePath, "data.win");
