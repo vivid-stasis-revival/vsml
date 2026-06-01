@@ -19,6 +19,9 @@
 请注意：程序会先进行字符串修补，再进行代码修补。
 所以如果你通过 *.xlsx 修补了字符串，就应该把 "Find" 的值改为修补后的文本。
 
+关于IPC模式：
+目前仅适用于与 "BVOClient(Better Vivid/stasis Opreation Client)" 使用
+
 【English】
 
 For each *.xlsx in /excel: column A must be the original text, and column B must be the modified text.
@@ -39,3 +42,6 @@ For codepatches.json:
 
 Please note: the program patches strings before patching codes.
 So if you patched strings with *.xlsx, you should change the "Find" value to the modified text.
+
+For IPC Mode:
+Currently only for "BVOClient(Better Vivid/stasis Opreation Client)" use
