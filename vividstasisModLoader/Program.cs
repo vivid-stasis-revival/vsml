@@ -569,6 +569,7 @@ void SaveConfig(ModLoaderConfig config, bool dryRun)
 void PauseAfterPatch(bool dryRun)
 {
     PrintSection("修补流程完成", "Patch flow completed");
+
     if (dryRun)
     {
         PrintInfo("[dry-run] 未实际写入任何文件。", "[dry-run] No files were actually modified.");
@@ -663,6 +664,7 @@ void Run(string[] inputArgs)
     SaveConfig(config, dryRun);
     PrintSuccess("配置已保存。", "Configuration saved.");
     PauseAfterPatch(dryRun);
+    PipeClient.SendMessage("PATCH_COMPLETE");
 }
 
 // 在文件底部统一触发执行。
