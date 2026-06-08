@@ -42,11 +42,39 @@ internal static class ConsoleOutput
         }
     }
 
+    private static string TranslateLevel(string level)
+    {
+        return level switch
+        {
+            "INFO" => "VML信息",
+            "STEP" => "VML步骤",
+            "SUCCESS" => "VML成功",
+            "WARN" => "VML警告",
+            "ERROR" => "VML错误",
+            "SECTION" => "VML阶段",
+            "SYSTEM" => "VML系统",
+            "INPUT" => "VML输入",
+            _ => $"VML{level}"
+        };
+    }
+
     /// <summary>
     /// 将日志写入 app-logs 目录下的当前运行日志文件。
     /// </summary>
     private static void WriteLogLine(string level, string zh, string en)
     {
+        string mappedLevel = TranslateLevel(level);
+
+        if (vividstasisModLoader.TVOClientCommunicate.PipeClient.IPCMode)
+        {
+            try
+            {
+                // 发送日志信息到BVOClient
+                vividstasisModLoader.TVOClientCommunicate.PipeClient.SendMessage($"[{mappedLevel}] {zh}");
+            }
+            catch { }
+        }
+
         if (LogWriter is null)
         {
             return;
@@ -54,7 +82,7 @@ internal static class ConsoleOutput
 
         lock (LogLock)
         {
-            LogWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{level}] {zh} ({en})");
+            LogWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{mappedLevel}] {zh} ({en})");
         }
     }
 
@@ -197,6 +225,13 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintPauseHint()
     {
+        if (vividstasisModLoader.TVOClientCommunicate.PipeClient.IPCMode)
+        {
+            AnsiConsole.MarkupLine("[green]修补完成，IPC模式将自动退出。[/] [grey](Patching completed, auto exit.)[/]");
+            WriteLogLine("INFO", "修补完成，IPC模式自动退出。", "Patching completed, auto exit.");
+            return;
+        }
+
         AnsiConsole.MarkupLine("[green]修补完成，按 Enter 退出。[/] [grey](Patching completed, press Enter to exit.)[/]");
         WriteLogLine("INFO", "修补完成，等待用户按 Enter 退出。", "Patching completed, waiting for Enter to exit.");
         Console.ReadLine();
