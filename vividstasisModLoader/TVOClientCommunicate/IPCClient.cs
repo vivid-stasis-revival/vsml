@@ -2,6 +2,7 @@
 using System.IO;
 using System.IO.Pipes;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 using vividstasisModLoader;
@@ -102,6 +103,18 @@ namespace vividstasisModLoader.TVOClientCommunicate
             {
                 Console.WriteLine("[VML IPC] 无法连接到IPC服务器，发送消息失败: " + ex.Message);
             }
+        }
+
+        public static void SendException(Exception exception)
+        {
+            var payload = JsonSerializer.Serialize(new
+            {
+                exception_type = exception.GetType().FullName ?? exception.GetType().Name,
+                message = exception.Message,
+                details = exception.ToString()
+            });
+
+            SendMessage($"VML_EXCEPTION {payload}");
         }
     }
 }

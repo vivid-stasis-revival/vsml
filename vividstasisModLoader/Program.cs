@@ -1,6 +1,9 @@
 ﻿using Microsoft.Win32;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using UndertaleModLib;
 using vividstasisModLoader;
 using vividstasisModLoader.TVOClientCommunicate;
@@ -87,22 +90,113 @@ ModLoaderConfig LoadConfig()
     return config ?? new ModLoaderConfig();
 }
 
-// 自动检测游戏目录，检测失败时提示用户手动输入。
-string ResolveGamePath()
+// 判断候选目录是否为可读取的 vivid/stasis 游戏目录。
+bool IsUsableGamePath(string? gamePath)
 {
-    var gamePath = Registry.GetValue(
+    return !string.IsNullOrWhiteSpace(gamePath)
+        && Directory.Exists(gamePath)
+        && File.Exists(Path.Combine(gamePath, "data.win"));
+}
+
+// 从 VML 可执行文件目录创建或读取 path.json。
+// 通过 BVO 启动时 AppContext.BaseDirectory 同样指向 BVO 的 vml 目录。
+GamePathConfig LoadOrCreateGamePathConfig()
+{
+    var pathConfigFile = Path.Combine(AppContext.BaseDirectory, "path.json");
+    var defaultConfig = new GamePathConfig
+    {
+        ForceCustomPath = false
+    };
+
+    if (!File.Exists(pathConfigFile))
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(
+                defaultConfig,
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                }
+            );
+            File.WriteAllText(pathConfigFile, json);
+            PrintInfo(
+                $"已创建游戏路径配置：{pathConfigFile}",
+                $"Created game path configuration: {pathConfigFile}"
+            );
+        }
+        catch (Exception e)
+        {
+            PrintWarning(
+                $"无法创建 path.json：{e.Message}",
+                $"Could not create path.json: {e.Message}"
+            );
+        }
+
+        return defaultConfig;
+    }
+
+    try
+    {
+        var config = JsonSerializer.Deserialize<GamePathConfig>(File.ReadAllText(pathConfigFile));
+        return config ?? defaultConfig;
+    }
+    catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
+    {
+        PrintWarning(
+            $"无法读取 path.json，将忽略自定义路径：{e.Message}",
+            $"Could not read path.json; the custom path will be ignored: {e.Message}"
+        );
+        return defaultConfig;
+    }
+}
+
+// 自动检测游戏目录，检测失败时再使用 path.json 的 game_path。
+string ResolveGamePath(GamePathConfig pathConfig)
+{
+    var detectedGamePath = Registry.GetValue(
         @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 2093940",
         "InstallLocation",
         null
     ) as string ?? string.Empty;
 
-    if (gamePath == string.Empty || !Directory.Exists(gamePath))
+    if (IsUsableGamePath(detectedGamePath))
     {
-        PrintWarning("未能自动检测到游戏路径，请确认 vivid/stasis 已安装。", "Couldn't find game path automatically. Please make sure vivid/stasis is installed.");
-        gamePath = AskGamePath();
+        return detectedGamePath;
     }
 
-    return gamePath;
+    if (IsUsableGamePath(pathConfig.GamePath))
+    {
+        PrintWarning(
+            "自动检测游戏目录失败，正在使用 path.json 中的 game_path。",
+            "Automatic game path detection failed; using game_path from path.json."
+        );
+        return pathConfig.GamePath;
+    }
+
+    PrintWarning(
+        "自动检测和 path.json 均未提供有效游戏目录，请手动输入。",
+        "Neither automatic detection nor path.json provided a valid game directory; please enter one manually."
+    );
+    return AskGamePath();
+}
+
+// force_custom_path 启用时只接受 path.json 的 game_path，不再读取 IPC 或注册表路径。
+string ResolveForcedCustomGamePath(GamePathConfig pathConfig)
+{
+    if (!IsUsableGamePath(pathConfig.GamePath))
+    {
+        throw new DirectoryNotFoundException(
+            "path.json 已启用 force_custom_path，但 game_path 不是包含 data.win 的有效游戏目录。"
+        );
+    }
+
+    PrintInfo(
+        "path.json 已启用 force_custom_path，已绕过全部游戏目录自动获取。",
+        "force_custom_path is enabled in path.json; all automatic game path discovery has been bypassed."
+    );
+    return pathConfig.GamePath;
 }
 
 // 在还原模式下恢复备份文件并删除备份目录。
@@ -518,13 +612,104 @@ void PatchRawFiles(string[] modDirs, string gamePath, string backupFolderPath, b
     }
 }
 
+// 仅允许 UndertaleModLib 跳过由纯零字节组成的向前对齐区。
+// 这类间隙不包含资源数据；其他重要警告仍应中止，避免自动保存不安全的数据。
+bool TryAcceptZeroPaddingAlignmentWarning(
+    Stream validationStream,
+    string warning,
+    out long skippedBytes)
+{
+    skippedBytes = 0;
+
+    var match = Regex.Match(
+        warning,
+        @"^Reading misaligned at (?<actual>[0-9A-Fa-f]+), realigning back to (?<expected>[0-9A-Fa-f]+)",
+        RegexOptions.CultureInvariant
+    );
+
+    if (!match.Success
+        || !long.TryParse(match.Groups["actual"].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var actual)
+        || !long.TryParse(match.Groups["expected"].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var expected)
+        || actual < 0
+        || expected <= actual
+        || expected > validationStream.Length)
+    {
+        return false;
+    }
+
+    validationStream.Position = actual;
+    var remaining = expected - actual;
+    var buffer = new byte[81920];
+
+    while (remaining > 0)
+    {
+        var bytesToRead = (int)Math.Min(buffer.Length, remaining);
+        var bytesRead = validationStream.Read(buffer, 0, bytesToRead);
+        if (bytesRead != bytesToRead)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < bytesRead; i++)
+        {
+            if (buffer[i] != 0)
+            {
+                return false;
+            }
+        }
+
+        remaining -= bytesRead;
+    }
+
+    skippedBytes = expected - actual;
+    return true;
+}
+
 // 读取 data.win 并解析为 UndertaleData。
 UndertaleData ReadDataFile(FileInfo dataFile)
 {
     try
     {
         using var fs = dataFile.OpenRead();
-        return UndertaleIO.Read(fs);
+        using var validationStream = dataFile.OpenRead();
+        var acceptedAlignmentGapCount = 0;
+        long acceptedAlignmentGapBytes = 0;
+        var nonImportantWarnings = new List<string>();
+
+        var data = UndertaleIO.Read(fs, (warning, isImportant) =>
+        {
+            if (!isImportant)
+            {
+                nonImportantWarnings.Add(warning);
+                return;
+            }
+
+            if (TryAcceptZeroPaddingAlignmentWarning(validationStream, warning, out var skippedBytes))
+            {
+                acceptedAlignmentGapCount++;
+                acceptedAlignmentGapBytes += skippedBytes;
+                return;
+            }
+
+            throw new InvalidDataException(
+                $"UndertaleModLib 报告了无法安全忽略的文件读取警告：{Environment.NewLine}{warning}"
+            );
+        });
+
+        if (acceptedAlignmentGapCount > 0)
+        {
+            PrintWarning(
+                $"检测到并安全跳过 {acceptedAlignmentGapCount:N0} 个纯零对齐区，共 {acceptedAlignmentGapBytes:N0} 字节。",
+                $"Detected and safely skipped {acceptedAlignmentGapCount:N0} zero-filled alignment gaps ({acceptedAlignmentGapBytes:N0} bytes total)."
+            );
+        }
+
+        foreach (var warning in nonImportantWarnings.Distinct())
+        {
+            PrintWarning($"UndertaleModLib：{warning}", $"UndertaleModLib: {warning}");
+        }
+
+        return data;
     }
     catch (FileNotFoundException e)
     {
@@ -618,16 +803,23 @@ void Run(string[] inputArgs)
     CreateRestoreScript(dryRun);
 
     var config = LoadConfig();
-    // IPC模式下直接读取TVOClient传递的游戏目录
+    var pathConfig = LoadOrCreateGamePathConfig();
+
+    // force_custom_path 的优先级最高；否则 IPC 模式使用 BVO 传入路径，
+    // 独立运行时执行注册表检测与 path.json 回退。
     string gamePath;
 
-    if (PipeClient.IPCMode)
+    if (pathConfig.ShouldForceCustomPath)
+    {
+        gamePath = ResolveForcedCustomGamePath(pathConfig);
+    }
+    else if (PipeClient.IPCMode)
     {
         gamePath = PipeClient.GamePath;
     }
     else
     {
-        gamePath = ResolveGamePath();
+        gamePath = ResolveGamePath(pathConfig);
     }
 
     config.GamePath = gamePath;
@@ -667,12 +859,46 @@ void Run(string[] inputArgs)
     PipeClient.SendMessage("PATCH_COMPLETE");
 }
 
-// 在文件底部统一触发执行。
-Run(args);
+// 在文件底部统一触发执行，并防止未处理异常触发 Windows 应用程序错误弹窗。
+try
+{
+    Run(args);
+}
+catch (Exception e)
+{
+    PrintError($"修补已停止：{e.Message}", $"Patching stopped: {e.Message}");
+    Console.Error.WriteLine(e);
+    PipeClient.SendException(e);
+    PipeClient.SendMessage("PATCH_FAILED");
+    Environment.ExitCode = 1;
+
+    if (!PipeClient.IPCMode)
+    {
+        Console.WriteLine("修补失败，按 Enter 退出。 (Patching failed, press Enter to exit.)");
+        Console.ReadLine();
+    }
+}
 
 // 配置对象，保存基础运行参数。
 class ModLoaderConfig
 {
     public string GamePath { get; set; } = string.Empty;
+}
+
+class GamePathConfig
+{
+    [JsonPropertyName("game_path")]
+    public string GamePath { get; set; } = @"C:\example\path\";
+
+    [JsonPropertyName("force_use_custom_path")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ForceUseCustomPath { get; set; }
+
+    [JsonPropertyName("force_custom_path")]
+    public bool? ForceCustomPath { get; set; }
+
+    // 新字段存在时以新字段为准；旧配置缺少新字段时兼容原字段。
+    [JsonIgnore]
+    public bool ShouldForceCustomPath => ForceCustomPath ?? ForceUseCustomPath;
 }
 
