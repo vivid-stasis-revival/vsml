@@ -1,0 +1,38 @@
+diff --git a/UndertaleModLib/UndertaleIO.cs b/UndertaleModLib/UndertaleIO.cs
+index d48f6616..5d142c5e 100644
+--- a/UndertaleModLib/UndertaleIO.cs
++++ b/UndertaleModLib/UndertaleIO.cs
+@@ -733,11 +733,32 @@ namespace UndertaleModLib
+                 if (length != expectedLength)
+                 {
+                     int diff = (int)expectedLength - (int)length;
+-                    reader.SubmitWarning("WARNING: File specified length " + expectedLength + ", but read only " + length + " (" + diff + " padding?)");
+                     if (diff > 0)
++                    {
++                        long paddingStart = reader.Position;
++                        bool isZeroPadding = true;
++
++                        for (int i = 0; i < diff; i++)
++                        {
++                            if (reader.ReadByte() != 0)
++                            {
++                                isZeroPadding = false;
++                                break;
++                            }
++                        }
++
++                        reader.Position = paddingStart;
++                        reader.SubmitWarning(
++                            "WARNING: File specified length " + expectedLength + ", but read only " + length + " (" + diff + " padding?)",
++                            !isZeroPadding
++                        );
+                         reader.Position += (uint)diff;
++                    }
+                     else
++                    {
++                        reader.SubmitWarning("WARNING: File specified length " + expectedLength + ", but read only " + length + " (" + diff + " padding?)");
+                         throw new IOException("Read underflow");
++                    }
+                 }
+             }
+         }
