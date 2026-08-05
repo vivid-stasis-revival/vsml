@@ -19,7 +19,7 @@ public class ObjectPatcher(UndertaleData data, string modDir)
         var files = Directory.EnumerateFiles(_objectPath, "*.json");
         foreach (var objJson in files)
         {
-            var objectPatch = JsonSerializer.Deserialize<ObjectPatch>(File.ReadAllText(objJson));
+            var objectPatch = SimpleJson.ParseObjectPatch(File.ReadAllText(objJson));
             if (string.IsNullOrEmpty(objectPatch.Name)) continue;
             var obj = new UndertaleGameObject();
             obj.Name = data.Strings.MakeString(objectPatch.Name);

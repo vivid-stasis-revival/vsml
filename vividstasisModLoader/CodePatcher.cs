@@ -134,7 +134,7 @@ public class CodePatcher(UndertaleData data, string modDir)
         if (!File.Exists(_patchFilePath)) return;
         CodeImportGroup group = new(data) { AutoCreateAssets = true };
         _globalDecompileContext = new GlobalDecompileContext(data);
-        _patches = JsonSerializer.Deserialize<List<CodePatch>>(File.ReadAllText(_patchFilePath));
+        _patches = SimpleJson.ParseCodePatchList(File.ReadAllText(_patchFilePath));
         if (_patches == null) return;
         foreach (var patch in _patches)
         {

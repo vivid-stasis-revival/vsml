@@ -1,0 +1,7 @@
+<Directives>
+  <Application>
+    <!-- 保留 UndertaleModLib 所有类型，防止 AOT 修剪导致 FillUnserializeCountDictionaries 失败 -->
+    <Assembly Name="UndertaleModLib" Dynamic="Required All" />
+    <Assembly Name="Underanalyzer" Dynamic="Required All" />
+  </Application>
+</Directives>

@@ -1,0 +1,77 @@
+name: VML CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vml-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish VML
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "true"
+
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish VML
+        shell: pwsh
+        run: >-
+          dotnet publish vividstasisModLoader\vividstasisModLoader.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -o artifacts\vml
+          -f net10.0
+
+      - name: Verify published artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          [xml]$project = Get-Content -Raw vividstasisModLoader\vividstasisModLoader.csproj
+          $expectedVersion = $project.Project.PropertyGroup.Version
+          $expectedFileVersion = $project.Project.PropertyGroup.FileVersion
+          $executable = Get-Item artifacts\vml\vividstasisModLoader.exe
+
+          if ($executable.VersionInfo.FileVersion -ne $expectedFileVersion) {
+            throw "Expected file version $expectedFileVersion, got $($executable.VersionInfo.FileVersion)."
+          }
+
+          $appInfo = Get-Content -Raw vividstasisModLoader\AppInfo.cs
+          if ($appInfo -notmatch ('VERSION = "v' + [regex]::Escape($expectedVersion) + '"')) {
+            throw "AppInfo.VERSION does not match project version $expectedVersion."
+          }
+
+          if (-not (Test-Path artifacts\vml\path.json -PathType Leaf)) {
+            throw "Published artifact is missing path.json."
+          }
+
+      - name: Upload VML artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vml-win-x64
+          path: artifacts\vml
+          if-no-files-found: error
