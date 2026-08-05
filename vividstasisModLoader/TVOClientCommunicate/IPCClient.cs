@@ -114,5 +114,17 @@ namespace vividstasisModLoader.TVOClientCommunicate
             IPCMode = false;
             Console.Error.WriteLine("[VML IPC] Pipe closed.");
         }
+
+        public static void SendException(Exception exception)
+        {
+            var payload = JsonSerializer.Serialize(new
+            {
+                exception_type = exception.GetType().FullName ?? exception.GetType().Name,
+                message = exception.Message,
+                details = exception.ToString()
+            });
+
+            SendMessage($"VML_EXCEPTION {payload}");
+        }
     }
 }

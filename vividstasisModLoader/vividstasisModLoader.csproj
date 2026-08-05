@@ -55,16 +55,8 @@
     </Content>
   </ItemGroup>
 
-  <!-- Publish 完成后自动打包并上传到 Samba -->
-  <Target Name="RunPostBuildScript"
-          AfterTargets="Publish"
-          Condition="'$(SkipPostBuildScript)' != 'true'">
-    <PropertyGroup>
-      <PostBuildScript>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', 'PostBuild.ps1'))</PostBuildScript>
-    </PropertyGroup>
-    <Message Importance="high" Text="Running PostBuild.ps1..." />
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;&amp; { &amp; '$(PostBuildScript)' -PublishDir '$(PublishDir)' -Version '$(Version)' }&quot;" />
-    <Message Importance="high" Text="PostBuild.ps1 done." />
+  <Target Name="ApplyUndertaleModToolPatches" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Apply-UndertaleModToolPatches.ps1&quot;" />
   </Target>
 
 </Project>
