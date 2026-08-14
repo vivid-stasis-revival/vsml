@@ -1,7 +1,7 @@
 ## 简介
 
 - 这个工具的原作者并不是我，我只是暂时帮忙维护这个工具。
-- 这个工具使用了[Underanalyzer](https://github.com/UnderminersTeam/Underanalyzer)]和[UndertaleModTool](https://github.com/UnderminersTeam/UndertaleModTool)的部分模块，所以也请支持他们！
+- 这个工具使用了[Underanalyzer](https://github.com/UnderminersTeam/Underanalyzer)和[UndertaleModTool](https://github.com/UnderminersTeam/UndertaleModTool)的部分模块，所以也请支持他们！
 
 ## Description
 
@@ -21,8 +21,8 @@
 4. Type：
         0：将找到的所有字符串都替换为 Value。
         1：将找到的第一个字符串替换为 Value。
-        2：在 Function 前插入 Value；当 Function 为空时，Value 会插入到该 Entry 末尾。
-        3：在 Function 后插入 Value；当 Function 为空时，Value 会插入到该 Entry 开头。
+        2：在 Function 函数体的开头插入 Value（紧跟在 { 之后）；当 Function 为空时，Value 会插入到该 Entry 的开头。
+        3：在 Function 函数体的末尾插入 Value（紧邻 } 之前）；当 Function 为空时，Value 会插入到该 Entry 的末尾。
 5. Function：目标函数名称，仅在 Type 为 2 或 3 时使用。
 6. ExternalFile：/codepatches 中的文件名；若指定该项，则会忽略 Value。
 7. OnMiss：可选，锚点未命中（Entry 不存在、Find 找不到、Function 找不到）时的处理级别，缺省为 Warn。
@@ -38,6 +38,9 @@ codepatches.json 无法解析、缺少 Entry、Type 不在 0-3 范围内、Type 
 ExternalFile 指向的文件不存在、目标条目反编译失败、目标条目是匿名函数引用。
 中止发生在写回 data.win 之前，因此游戏文件仍保持在还原备份后的干净状态。
 
+注意：程序会先修补文本，再修补代码。
+所以如果你已经用 *.xlsx 改过文本，Find 里要填改之后的文本。
+
 ## Use Guide
 
 For each *.xlsx in /excel: column A must be the original text, and column B must be the modified text.
@@ -51,8 +54,8 @@ For codepatches.json:
 4. Type:
         0: Replace all found strings with Value.
         1: Replace the first found string with Value.
-        2: Insert Value before Function; when Function is empty, Value will be inserted at the end of the entry.
-        3: Insert Value after Function; when Function is empty, Value will be inserted at the beginning of the entry.
+        2: Insert Value at the beginning of Function's body (right after its opening brace); when Function is empty, Value will be inserted at the beginning of the entry.
+        3: Insert Value at the end of Function's body (right before its closing brace); when Function is empty, Value will be inserted at the end of the entry.
 5. Function: name of the target function, only used when Type is 2 or 3.
 6. ExternalFile: name of the file in /codepatches; if this is specified, Value will be ignored.
 7. OnMiss: optional. How to react when the anchor is not matched (Entry does not exist, Find not found, Function not found). Defaults to Warn.
