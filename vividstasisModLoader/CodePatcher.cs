@@ -91,21 +91,19 @@ public class CodePatcher(UndertaleData data, string modDir)
                         }
                     }
 
-                    // If manually linking, do so
+                    // Queue with the rest of codes/ (GlobalScripts + other events).
+                    // Underanalyzer only treats a name as a global function if it is
+                    // already in Data.GlobalFunctions. CompileGroup first parses every
+                    // queued GlobalScript and registers those names, then compiles
+                    // ObjectEvents. Importing each object alone (the old path) ran
+                    // before any mod GlobalScripts were registered, so vs_* calls
+                    // compiled as instance-variable reads and crashed at runtime.
                     if (!manualLink)
                     {
-                        
-                     CodeImportGroup utdat = new(data);
-                     utdat.QueueReplace(codeName, code);
-                     var _result = utdat.Import();
-                        if (!_result.Successful)
-                        {
-                            ConsoleOutput.PrintError("代码导入失败。", "Code import unsuccessful.");
-                            ConsoleOutput.PrintError(_result.PrintAllErrors(false), _result.PrintAllErrors(false));
-                        }
+                        replaceGroup.QueueReplace(codeName, code);
                         continue;
                     }
-                    ;
+
                     // Create new object if necessary
                     var obj = data.GameObjects.ByName(objectName);
                     if (obj is null)
