@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vividstasisModLoader", "vividstasisModLoader\vividstasisModLoader.csproj", "{CB625178-EE6B-4669-84AF-9161D28F999E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{15000979-105C-0227-C069-94076D6D2DCA} = {15000979-105C-0227-C069-94076D6D2DCA}
+		{48783209-6DA9-2C2C-45A2-B407F849FFF4} = {48783209-6DA9-2C2C-45A2-B407F849FFF4}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Underanalyzer", "UndertaleModTool\Underanalyzer\Underanalyzer\Underanalyzer.csproj", "{48783209-6DA9-2C2C-45A2-B407F849FFF4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UndertaleModLib", "UndertaleModTool\UndertaleModLib\UndertaleModLib.csproj", "{15000979-105C-0227-C069-94076D6D2DCA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CB625178-EE6B-4669-84AF-9161D28F999E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CB625178-EE6B-4669-84AF-9161D28F999E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CB625178-EE6B-4669-84AF-9161D28F999E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CB625178-EE6B-4669-84AF-9161D28F999E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48783209-6DA9-2C2C-45A2-B407F849FFF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48783209-6DA9-2C2C-45A2-B407F849FFF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48783209-6DA9-2C2C-45A2-B407F849FFF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48783209-6DA9-2C2C-45A2-B407F849FFF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15000979-105C-0227-C069-94076D6D2DCA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15000979-105C-0227-C069-94076D6D2DCA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15000979-105C-0227-C069-94076D6D2DCA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15000979-105C-0227-C069-94076D6D2DCA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

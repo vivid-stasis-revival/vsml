@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Version>0.1.3</Version>
+    <AssemblyVersion>0.1.3.0</AssemblyVersion>
+    <FileVersion>0.1.3.0</FileVersion>
+    <AssemblyName>VSML-Cross</AssemblyName>
+    <RootNamespace>vividstasisModLoader</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <CetCompat>false</CetCompat>
+    <TargetFramework>net10.0</TargetFramework>
+    <DefaultTargetFramework>net10.0</DefaultTargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64;linux-arm64</RuntimeIdentifiers>
+    <SelfContained>true</SelfContained>
+    <PublishAot>false</PublishAot>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <DebugType>None</DebugType>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NPOI" Version="2.7.4" />
+    <PackageReference Include="Spectre.Console" Version="0.55.2" />
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.12.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UndertaleModTool\UndertaleModLib\UndertaleModLib.csproj" />
+    <ProjectReference Include="..\UndertaleModTool\Underanalyzer\Underanalyzer\Underanalyzer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="mods\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="000ReadMe.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="path.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
