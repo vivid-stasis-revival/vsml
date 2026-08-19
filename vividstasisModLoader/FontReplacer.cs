@@ -8,7 +8,7 @@ namespace vividstasisModLoader;
 public class FontReplacer(UndertaleData data,string modDir)
 {
     private const string PackagerDirPath = "./packager";
-    private readonly string _sourcePath = $"{modDir}/fonts";
+    private readonly string _sourcePath = Path.Combine(modDir, "fonts");
     private const string SearchPattern = "*.png";
     private readonly string _outName = Path.Combine(PackagerDirPath, "atlas.txt");
     private const int TextureSize = 4096;

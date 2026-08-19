@@ -6,7 +6,7 @@ namespace vividstasisModLoader;
 
 public class ShaderReplacer(UndertaleData data, string modDir)
 {
-    readonly string _importFolder = $"{modDir}/shaders";
+    readonly string _importFolder = Path.Combine(modDir, "shaders");
 
     public bool Exist()
     {
@@ -44,7 +44,7 @@ public class ShaderReplacer(UndertaleData data, string modDir)
     }
     void ImportShader(UndertaleShader existing_shader)
     {
-        var localImportDir = _importFolder + "/" + existing_shader.Name.Content + "/";
+        var localImportDir = Path.Combine(_importFolder, existing_shader.Name.Content) + Path.DirectorySeparatorChar;
         if (File.Exists(localImportDir + "Type.txt"))
         {
             var shader_type = File.ReadAllText(localImportDir + "Type.txt");
@@ -129,7 +129,7 @@ public class ShaderReplacer(UndertaleData data, string modDir)
     {
         var new_shader = new UndertaleShader();
         new_shader.Name = data.Strings.MakeString(shader_name);
-        var localImportDir = _importFolder + "/" + shader_name + "/";
+        var localImportDir = Path.Combine(_importFolder, shader_name) + Path.DirectorySeparatorChar;
         if (File.Exists(localImportDir + "Type.txt"))
         {
             var shader_type = File.ReadAllText(localImportDir + "Type.txt");
