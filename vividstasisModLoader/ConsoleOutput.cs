@@ -23,7 +23,7 @@ internal static class ConsoleOutput
         var configuredLogDirectory = GetOptionValue(args, "--app-logs")
             ?? GetOptionValue(args, "--log-dir")
             ?? Path.Combine(AppContext.BaseDirectory, "app-logs");
-        _logDirectoryPath = Path.GetFullPath(configuredLogDirectory);
+        _logDirectoryPath = CrossPlatformPath.GetFullPath(configuredLogDirectory);
         InitializeLogging();
 
         if (_silentMode)
