@@ -5,12 +5,12 @@ using UndertaleModLib.Util;
 
 namespace vividstasisModLoader;
 
-public class FontReplacer(UndertaleData data,string modDir)
+public class FontReplacer(UndertaleData data, string modDir, string? packagerDirectory = null)
 {
-    private const string PackagerDirPath = "./packager";
+    private readonly string _packagerDirPath = packagerDirectory ?? "./packager";
     private readonly string _sourcePath = $"{modDir}/fonts";
     private const string SearchPattern = "*.png";
-    private readonly string _outName = Path.Combine(PackagerDirPath, "atlas.txt");
+    private readonly string _outName = Path.Combine(packagerDirectory ?? "./packager", "atlas.txt");
     private const int TextureSize = 4096;
     private const int Border = 2;
 
@@ -24,7 +24,7 @@ public class FontReplacer(UndertaleData data,string modDir)
     public void Execute()
     {
         if(!Exist()) return;
-        Directory.CreateDirectory(PackagerDirPath);
+        Directory.CreateDirectory(_packagerDirPath);
         _packer.Process(_sourcePath, SearchPattern, TextureSize, Border);
         _packer.SaveAtlasses(_outName);
 
@@ -83,7 +83,7 @@ public class FontReplacer(UndertaleData data,string modDir)
             }
             atlasCount++;
         }
-        Directory.Delete(PackagerDirPath, true);
+        Directory.Delete(_packagerDirPath, true);
     }
     private void fontUpdate(UndertaleFont newFont)
     {

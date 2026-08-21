@@ -19,7 +19,14 @@ public class ObjectPatcher(UndertaleData data, string modDir)
         var files = Directory.EnumerateFiles(_objectPath, "*.json");
         foreach (var objJson in files)
         {
-            var objectPatch = JsonSerializer.Deserialize<ObjectPatch>(File.ReadAllText(objJson));
+            using var document = JsonDocument.Parse(File.ReadAllText(objJson));
+            var root = document.RootElement;
+            var objectPatch = new ObjectPatch
+            {
+                Name = ReadString(root, "Name"),
+                Parent = ReadString(root, "Parent"),
+                Awake = root.TryGetProperty("Awake", out var awake) && awake.ValueKind == JsonValueKind.True
+            };
             if (string.IsNullOrEmpty(objectPatch.Name)) continue;
             var obj = new UndertaleGameObject();
             obj.Name = data.Strings.MakeString(objectPatch.Name);
@@ -27,6 +34,13 @@ public class ObjectPatcher(UndertaleData data, string modDir)
             obj.Awake = objectPatch.Awake;
             data.GameObjects.Add(obj);
         }
+    }
+
+    private static string ReadString(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
     }
 }
 public class ObjectPatch

@@ -8,21 +8,34 @@ using UndertaleModLib.Models;
 
 namespace vividstasisModLoader;
 
-public class CodePatcher(UndertaleData data, string modDir)
+public class CodePatcher(UndertaleData data, string modDir, IVsmlLogger? logger = null)
 {
+    private readonly IVsmlLogger _logger = logger ?? NullVsmlLogger.Instance;
     private string _patchFilePath = $"{modDir}/codepatches.json";
     private string _codeReplacePath = $"{modDir}/codes/";
     private string _codePatchesPath = $"{modDir}/codepatches/";
     private List<CodePatch>? _patches = [];
     private GlobalDecompileContext _globalDecompileContext;
     private Dictionary<string, string> _cachedCodes = [];
+    private HashSet<string> _replacedEntries = [];
 
     const string objectPrefix = "gml_Object_";
 
-    public bool Exist()
+    public int GetCodeFileCount()
+    {
+        int count = 0;
+        if (Directory.Exists(_codeReplacePath))
+            count += Directory.GetFiles(_codeReplacePath, "*.gml").Length;
+        if (File.Exists(_patchFilePath))
+            count += 1; // codepatches.json counts as one code patch set
+        return count;
+    }
+public bool Exist()
     {
         return Directory.Exists(_codeReplacePath) || File.Exists(_patchFilePath);
     }
+
+    public HashSet<string> GetReplacedEntries() => _replacedEntries;
 
     public void Execute()
     {
@@ -30,11 +43,18 @@ public class CodePatcher(UndertaleData data, string modDir)
 
         if (Directory.Exists(_codeReplacePath))
         {
-            CodeImportGroup replaceGroup = new(data) { AutoCreateAssets = true };
-            foreach (var file in Directory.GetFiles(_codeReplacePath, "*.gml"))
+            var pendingFiles = Directory.GetFiles(_codeReplacePath, "*.gml").OrderBy(f => f).ToList();
+            // Keep every GlobalScript and object event in one import group.
+            // Underanalyzer registers queued GlobalScripts before compiling
+            // object events, which is required for object code to resolve
+            // functions introduced by the same mod (upstream VML 0.1.4).
+            var importGroup = new CodeImportGroup(data) { AutoCreateAssets = true };
+
+            foreach (var file in pendingFiles)
             {
                 var code = File.ReadAllText(file);
                 var codeName = Path.GetFileNameWithoutExtension(file);
+                _logger.Info("code", $"处理代码文件: {codeName}", $"Processing code file: {codeName}", modDir, codeName);
                 // replaceGroup.QueueReplace(codeName, code);
                 var manualLink = false;
                 if (codeName.StartsWith(objectPrefix, StringComparison.Ordinal))
@@ -44,14 +64,14 @@ public class CodePatcher(UndertaleData data, string modDir)
                     // 调试时可在此观察下划线分割位置。
                     if (lastUnderscore <= 0 || secondLastUnderscore <= 0)
                     {
-                        ConsoleOutput.PrintError($"无法解析对象代码条目名：\"{codeName}\"。", $"Failed to parse object code entry name: \"{codeName}\".");
+                        _logger.Error("code", $"无法解析对象代码条目名：\"{codeName}\"。", $"Failed to parse object code entry name: \"{codeName}\".", modDir, codeName);
                         continue;
                     }
 
                     // Extract object name, event type, and event subtype
                     var objectName = codeName.AsSpan(new Range(objectPrefix.Length, secondLastUnderscore));
                     var eventType = codeName.AsSpan(new Range(secondLastUnderscore + 1, lastUnderscore));
-                    ConsoleOutput.PrintInfo($"对象名与事件类型：{objectName.ToString()} / {eventType.ToString()}", $"Object and event type: {objectName.ToString()} / {eventType.ToString()}");
+                    _logger.Info("code", $"对象名与事件类型：{objectName.ToString()} / {eventType.ToString()}", $"Object and event type: {objectName.ToString()} / {eventType.ToString()}", modDir, codeName);
                     if (!uint.TryParse(codeName.AsSpan(lastUnderscore + 1), out var eventSubtype))
                     {
                         // No number at the end of the name; parse it out as best as possible (may technically be ambiguous sometimes...).
@@ -86,24 +106,19 @@ public class CodePatcher(UndertaleData data, string modDir)
                         }
                         else
                         {
-                            ConsoleOutput.PrintError($"无法解析事件类型和子类型：\"{codeName}\"。", $"Failed to parse event type and subtype for \"{codeName}\".");
+                            _logger.Error("code", $"无法解析事件类型和子类型：\"{codeName}\"。", $"Failed to parse event type and subtype for \"{codeName}\".", modDir, codeName);
                             continue;
                         }
                     }
 
-                    // Queue with the rest of codes/ (GlobalScripts + other events).
-                    // Underanalyzer only treats a name as a global function if it is
-                    // already in Data.GlobalFunctions. CompileGroup first parses every
-                    // queued GlobalScript and registers those names, then compiles
-                    // ObjectEvents. Importing each object alone (the old path) ran
-                    // before any mod GlobalScripts were registered, so vs_* calls
-                    // compiled as instance-variable reads and crashed at runtime.
+                    // If manually linking, do so
                     if (!manualLink)
                     {
-                        replaceGroup.QueueReplace(codeName, code);
+                        importGroup.QueueReplace(codeName, code);
+                        _replacedEntries.Add(codeName);
                         continue;
                     }
-
+                    ;
                     // Create new object if necessary
                     var obj = data.GameObjects.ByName(objectName);
                     if (obj is null)
@@ -118,27 +133,52 @@ public class CodePatcher(UndertaleData data, string modDir)
 
                     // Link to object's event with a blank code entry
                     var manualCode = UndertaleCode.CreateEmptyEntry(data, codeName);
-                    CodeImportGroup.LinkEvent(obj, manualCode, EventType.Collision, eventSubtype, replaceGroup.MainThreadAction);
+                    CodeImportGroup.LinkEvent(obj, manualCode, EventType.Collision, eventSubtype, importGroup.MainThreadAction);
                     // Perform code import using manual code entry
-                    replaceGroup.QueueReplace(manualCode, code);
+                    importGroup.QueueReplace(manualCode, code);
+                    _replacedEntries.Add(codeName);
                 }
                 else
                 {
-                    replaceGroup.QueueReplace(codeName, code);
+                    importGroup.QueueReplace(codeName, code);
+                    _replacedEntries.Add(codeName);
                 }
             }
-            replaceGroup.Import();
+            if (pendingFiles.Count > 0)
+            {
+                var finalResult = importGroup.Import();
+                if (!finalResult.Successful)
+                {
+                    var detail = finalResult.PrintAllErrors(false);
+                    _logger.Error("code", "代码导入失败。", "Code import unsuccessful.", modDir);
+                    _logger.Error("code", detail, detail, modDir);
+                    throw new VsmlException("VSML_CODE_COMPILE_FAILED", "代码导入失败。", detail, modDir, file: _codeReplacePath);
+                }
+            }
         }
         if (!File.Exists(_patchFilePath)) return;
         CodeImportGroup group = new(data) { AutoCreateAssets = true };
         _globalDecompileContext = new GlobalDecompileContext(data);
-        _patches = JsonSerializer.Deserialize<List<CodePatch>>(File.ReadAllText(_patchFilePath));
+        using var patchDocument = JsonDocument.Parse(File.ReadAllText(_patchFilePath));
+        _patches = new List<CodePatch>();
+        foreach (var element in patchDocument.RootElement.EnumerateArray())
+        {
+            _patches.Add(new CodePatch
+            {
+                Entry = ReadString(element, "Entry"),
+                Type = (PatchType)ReadInt(element, "Type"),
+                Find = ReadString(element, "Find"),
+                Value = ReadString(element, "Value"),
+                ExternalFile = ReadString(element, "ExternalFile"),
+                Function = ReadString(element, "Function")
+            });
+        }
         if (_patches == null) return;
         foreach (var patch in _patches)
         {
             var code = data.Code.ByName(patch.Entry);
             if (code is null) {
-                ConsoleOutput.PrintWarning($"条目 {patch.Entry} 不存在。", $"Entry {patch.Entry} doesn't exist.");
+                _logger.Warning("code", $"条目 {patch.Entry} 不存在。", $"Entry {patch.Entry} doesn't exist.", modDir, patch.Entry);
                 return; }
                 
             if (!_cachedCodes.TryGetValue(patch.Entry, out string text))
@@ -183,13 +223,16 @@ public class CodePatcher(UndertaleData data, string modDir)
             }
             _cachedCodes[patch.Entry] = text;
             group.QueueReplace(patch.Entry, text);
+            _replacedEntries.Add(patch.Entry);
         }
 
         var result = group.Import();
         if (!result.Successful)
         {
-            ConsoleOutput.PrintError("代码导入失败。", "Code import unsuccessful.");
-            ConsoleOutput.PrintError(result.PrintAllErrors(false), result.PrintAllErrors(false));
+            var detail = result.PrintAllErrors(false);
+            _logger.Error("code", "代码导入失败。", "Code import unsuccessful.", modDir);
+            _logger.Error("code", detail, detail, modDir);
+            throw new VsmlException("VSML_CODE_COMPILE_FAILED", "代码导入失败。", detail, modDir, file: _patchFilePath);
         }
     }
 
@@ -436,6 +479,20 @@ public class CodePatcher(UndertaleData data, string modDir)
         }
 
         return -1;// 未找到匹配的结束大括号
+    }
+
+    private static string ReadString(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
+    }
+
+    private static int ReadInt(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetInt32()
+            : 0;
     }
 
     private static string InsertAtPosition(string code, int position, string insertCode)

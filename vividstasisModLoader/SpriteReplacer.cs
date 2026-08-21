@@ -7,14 +7,19 @@ using UndertaleModLib.Util;
 
 namespace vividstasisModLoader;
 
-public class SpriteReplacer(UndertaleData data,string modDir)
+public class SpriteReplacer(
+    UndertaleData data,
+    string modDir,
+    string? packagerDirectory = null,
+    IVsmlLogger? logger = null)
 {
-    static List<MagickImage> imagesToCleanup = [];
+    private readonly List<MagickImage> _imagesToCleanup = [];
+    private readonly IVsmlLogger _logger = logger ?? NullVsmlLogger.Instance;
     bool importAsSprite = true;
     Regex sprFrameRegex = new(@"^(.+?)(?:_(\d+))$", RegexOptions.Compiled);
     bool noMasksForBasicRectangles = data.IsVersionAtLeast(2022, 9);
     private string importFolder = $"{modDir}/sprites";
-    string packDir = "./packager";
+    private readonly string packDir = packagerDirectory ?? "./packager";
 
     public bool Exist()
     {
@@ -33,7 +38,7 @@ public class SpriteReplacer(UndertaleData data,string modDir)
             int textureSize = 4096;
             int PaddingValue = 2;
             bool debug = false;
-            Packer packer = new Packer();
+            Packer packer = new Packer(_imagesToCleanup);
             packer.Process(sourcePath, searchPattern, textureSize, PaddingValue, debug);
             packer.SaveAtlasses(outName);
 
@@ -123,7 +128,7 @@ public class SpriteReplacer(UndertaleData data,string modDir)
                             }
                             catch (Exception e)
                             {
-                                ConsoleOutput.PrintError($"图片命名无效，已跳过：{stripped}", $"Invalid image name, skipping: {stripped}");
+                                _logger.Error("sprite", $"图片命名无效，已跳过：{stripped}", $"Invalid image name, skipping: {stripped}", modDir, stripped);
                                 continue;
                             }
 
@@ -279,12 +284,16 @@ public class SpriteReplacer(UndertaleData data,string modDir)
         }
         finally
         {
-            foreach (MagickImage img in imagesToCleanup)
+            foreach (MagickImage img in _imagesToCleanup)
             {
                 img.Dispose();
             }
+            _imagesToCleanup.Clear();
+            if (Directory.Exists(packDir))
+            {
+                Directory.Delete(packDir, true);
+            }
         }
-        Directory.Delete(packDir, true);
     }
     public static SpriteType GetSpriteType(string path)
     {
@@ -357,6 +366,7 @@ public class SpriteReplacer(UndertaleData data,string modDir)
     }
     public class Packer
     {
+        private readonly List<MagickImage> _imagesToCleanup;
         public List<TextureInfo> SourceTextures;
         public StringWriter Log;
         public StringWriter Error;
@@ -366,8 +376,9 @@ public class SpriteReplacer(UndertaleData data,string modDir)
         public BestFitHeuristic FitHeuristic;
         public List<Atlas> Atlasses;
 
-        public Packer()
+        public Packer(List<MagickImage>? imagesToCleanup = null)
         {
+            _imagesToCleanup = imagesToCleanup ?? [];
             SourceTextures = new List<TextureInfo>();
             Log = new StringWriter();
             Error = new StringWriter();
@@ -483,7 +494,7 @@ public class SpriteReplacer(UndertaleData data,string modDir)
                         ColorSpace = ColorSpace.sRGB,
                     };
                     MagickImage img = new(fi.FullName);
-                    imagesToCleanup.Add(img);
+                    _imagesToCleanup.Add(img);
 
                     ti.Source = fi.FullName;
                     ti.BoundingWidth = (int)img.Width;

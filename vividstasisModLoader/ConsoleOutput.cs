@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using Spectre.Console;
+using System.Diagnostics;
 using System.Text;
 
 namespace vividstasisModLoader;
@@ -8,6 +10,50 @@ namespace vividstasisModLoader;
 /// </summary>
 internal static class ConsoleOutput
 {
+    private static bool _suppressInfoIpc = false;
+    private static bool _silentMode;
+
+    internal static bool IsSilentMode => _silentMode;
+
+    internal static void Configure(string[] args)
+    {
+        _silentMode = args.Any(arg =>
+            string.Equals(arg, "-slient", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(arg, "--slient", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(arg, "-silent", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(arg, "--silent", StringComparison.OrdinalIgnoreCase));
+
+        if (_silentMode)
+        {
+            Console.SetOut(TextWriter.Null);
+            Console.SetError(TextWriter.Null);
+        }
+    }
+
+    internal static void AllocateExternalConsole(int codeCount)
+    {
+        if (_silentMode) return;
+        if (_suppressInfoIpc) return;
+        _suppressInfoIpc = true;
+
+        // 通知 BVO 已弹出外置日志窗口
+        TVOClientCommunicate.PipeClient.SendMessage("EXTERNAL_CONSOLE");
+
+        // 启动可见 CMD 窗口实时 tail 日志文件
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/k powershell -NoLogo -Command \"Write-Host '=== VML 外置日志窗口 (代码补丁数量: " + codeCount + ") ==='; Get-Content -Path '" + LogFilePath + "' -Wait -Encoding UTF8\"",
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Normal
+            };
+            Process.Start(psi);
+        }
+        catch { }
+    }
+
     private static readonly object LogLock = new();
     private static readonly string LogDirectoryPath = string.Empty;
     private static readonly string LogFilePath = string.Empty;
@@ -65,12 +111,15 @@ internal static class ConsoleOutput
     {
         string mappedLevel = TranslateLevel(level);
 
-        if (vividstasisModLoader.TVOClientCommunicate.PipeClient.IPCMode)
+        if (!_silentMode && TVOClientCommunicate.PipeClient.IPCMode)
         {
             try
             {
-                // 发送日志信息到BVOClient
-                vividstasisModLoader.TVOClientCommunicate.PipeClient.SendMessage($"[{mappedLevel}] {zh}");
+                // 外置日志窗口模式下，抑制 INFO 级别 IPC 消息防止 BVO UI 卡死
+                if (!_suppressInfoIpc || level != "INFO")
+                {
+                    TVOClientCommunicate.PipeClient.SendMessage($"[{mappedLevel}] {zh}");
+                }
             }
             catch { }
         }
@@ -99,7 +148,8 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintInfo(string zh, string en)
     {
-        AnsiConsole.MarkupLine($"[cyan]信息[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
+        if (!_silentMode)
+            AnsiConsole.MarkupLine($"[cyan]信息[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
         WriteLogLine("INFO", zh, en);
     }
 
@@ -108,7 +158,8 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintStep(string zh, string en)
     {
-        AnsiConsole.MarkupLine($"[deepskyblue2]步骤[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
+        if (!_silentMode)
+            AnsiConsole.MarkupLine($"[deepskyblue2]步骤[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
         WriteLogLine("STEP", zh, en);
     }
 
@@ -117,7 +168,8 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintSuccess(string zh, string en)
     {
-        AnsiConsole.MarkupLine($"[green]成功[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
+        if (!_silentMode)
+            AnsiConsole.MarkupLine($"[green]成功[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
         WriteLogLine("SUCCESS", zh, en);
     }
 
@@ -126,7 +178,8 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintWarning(string zh, string en)
     {
-        AnsiConsole.MarkupLine($"[yellow]警告[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
+        if (!_silentMode)
+            AnsiConsole.MarkupLine($"[yellow]警告[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
         WriteLogLine("WARN", zh, en);
     }
 
@@ -135,7 +188,8 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintError(string zh, string en)
     {
-        AnsiConsole.MarkupLine($"[red]错误[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
+        if (!_silentMode)
+            AnsiConsole.MarkupLine($"[red]错误[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
         WriteLogLine("ERROR", zh, en);
     }
 
@@ -144,8 +198,11 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintSection(string zh, string en)
     {
-        var title = $"[bold orange1]{EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]";
-        AnsiConsole.Write(new Rule(title));
+        if (!_silentMode)
+        {
+            var title = $"[bold orange1]{EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]";
+            AnsiConsole.Write(new Rule(title));
+        }
         WriteLogLine("SECTION", zh, en);
     }
 
@@ -154,6 +211,13 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintAppBanner(string titleZh, string titleEn, string version, string changeLog)
     {
+        if (_silentMode)
+        {
+            WriteLogLine("SECTION", $"{titleZh} | 版本: {version}", $"{titleEn} | Version: {version}");
+            WriteLogLine("INFO", $"变更日志: {changeLog}", $"Change log: {changeLog}");
+            return;
+        }
+
         var panelContent = new Rows(
             new Align(new Markup($"[bold orange1]{EscapeMarkup(titleZh)}[/]"), HorizontalAlignment.Center),
             new Align(new Markup($"[grey]{EscapeMarkup(titleEn)}[/]"), HorizontalAlignment.Center),
@@ -178,6 +242,13 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintUnsafeRunPathPause(string path, string reasonZh, string reasonEn)
     {
+        if (_silentMode)
+        {
+            WriteLogLine("WARN", $"运行路径不安全：{path}", $"Unsafe run path: {path}");
+            WriteLogLine("WARN", reasonZh, reasonEn);
+            return;
+        }
+
         var panelContent = new Rows(
             new Align(new Markup("[bold red]运行路径不安全[/]"), HorizontalAlignment.Center),
             new Align(new Markup("[grey]Unsafe run path[/]"), HorizontalAlignment.Center),
@@ -205,6 +276,12 @@ internal static class ConsoleOutput
     /// </summary>
     internal static string AskGamePath()
     {
+        if (_silentMode)
+        {
+            WriteLogLine("ERROR", "静默模式无法请求交互式游戏路径。", "Silent mode cannot prompt for an interactive game path.");
+            return string.Empty;
+        }
+
         WriteLogLine("INPUT", "请求输入游戏路径。", "Prompting for game path.");
         var gamePath = AnsiConsole.Ask<string>("[yellow]请输入游戏路径 / Please input the game path:[/]");
         WriteLogLine("INPUT", $"输入游戏路径：{gamePath}", $"Input game path: {gamePath}");
@@ -216,7 +293,8 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintRestoreModeCompleted()
     {
-        AnsiConsole.MarkupLine("[green]还原模式已完成。[/] [grey](Restore mode completed.)[/]");
+        if (!_silentMode)
+            AnsiConsole.MarkupLine("[green]还原模式已完成。[/] [grey](Restore mode completed.)[/]");
         WriteLogLine("SUCCESS", "还原模式已完成。", "Restore mode completed.");
     }
 
@@ -225,7 +303,13 @@ internal static class ConsoleOutput
     /// </summary>
     internal static void PrintPauseHint()
     {
-        if (vividstasisModLoader.TVOClientCommunicate.PipeClient.IPCMode)
+        if (_silentMode)
+        {
+            WriteLogLine("INFO", "修补完成，静默模式自动退出。", "Patching completed, silent mode auto exit.");
+            return;
+        }
+
+        if (TVOClientCommunicate.PipeClient.IPCMode)
         {
             AnsiConsole.MarkupLine("[green]修补完成，IPC模式将自动退出。[/] [grey](Patching completed, auto exit.)[/]");
             WriteLogLine("INFO", "修补完成，IPC模式自动退出。", "Patching completed, auto exit.");

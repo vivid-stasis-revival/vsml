@@ -4,7 +4,7 @@
     <Version>0.1.4</Version>
     <AssemblyVersion>0.1.4.0</AssemblyVersion>
     <FileVersion>0.1.4.0</FileVersion>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <CetCompat>false</CetCompat>
     <TargetFramework>net10.0</TargetFramework>
     <DefaultTargetFramework>net10.0</DefaultTargetFramework>
@@ -12,16 +12,36 @@
     <Nullable>enable</Nullable>
     <InvariantGlobalization>true</InvariantGlobalization>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <SelfContained>true</SelfContained>
-    <PublishSingleFile>true</PublishSingleFile>
-    <DebugType>embedded</DebugType>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!--
+      VSML stays managed and is loaded by BVO through hostfxr.
+      Do not enable NativeAOT: the Rust host/bridge is built with the GNU toolchain,
+      and this project must not invoke the Windows/MSVC native linker.
+    -->
+    <SelfContained>false</SelfContained>
+    <PublishAot>false</PublishAot>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <DebugType>None</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- BVO loads VSML as a library through hostfxr. The legacy top-level CLI
+         entry point cannot participate in a Library build and is not used by
+         the DLL JSON ABI. -->
+    <Compile Remove="Program.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Costura.Fody" Version="6.2.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="NPOI" Version="2.7.4" />
     <PackageReference Include="Spectre.Console" Version="0.55.2" />
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.12.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,8 +68,16 @@
     </Content>
   </ItemGroup>
 
-  <Target Name="ApplyUndertaleModToolPatches" BeforeTargets="PrepareForBuild">
+  <Target Name="ApplyUndertaleModToolPatches"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(SkipUndertaleModToolPatches)' != 'true'">
     <Exec Command="powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Apply-UndertaleModToolPatches.ps1&quot;" />
+  </Target>
+
+  <Target Name="RejectNativeAot"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(PublishAot)' == 'true'">
+    <Error Text="VSML must remain a managed DLL loaded through hostfxr. NativeAOT and the Windows/MSVC native linker are not allowed." />
   </Target>
 
 </Project>
