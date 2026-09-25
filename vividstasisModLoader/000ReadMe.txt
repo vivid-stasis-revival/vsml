@@ -18,6 +18,9 @@ VSML-Cross
 使用 --app-logs 选择日志目录。--log-dir 也可作为
 别名使用。若未指定，日志将写入可执行文件旁边的 app-logs 目录中。
 
+路径兼容：命令行路径以及 codepatches.json 的 ExternalFile 同时接受 / 和 \\；
+在 macOS/Linux 上会自动将 Windows 风格反斜杠路径转换为当前系统路径。
+
 GameSpecificData 已嵌入 VSML-Cross 程序集，无需
 外部 GameSpecificData 目录。
 
@@ -57,6 +60,9 @@ Use --mods to select the mod directory. Without it, mods are read from the
 mods directory next to the executable.
 Use --app-logs to select the log directory. --log-dir is also accepted as an
 alias. Without it, logs are written to app-logs next to the executable.
+
+Path compatibility: command-line paths and codepatches.json ExternalFile values
+accept both / and \\. Windows-style separators are normalized on macOS/Linux.
 
 GameSpecificData is embedded in the VSML-Cross assembly and does not require
 an external GameSpecificData directory.

@@ -10,7 +10,7 @@ namespace vividstasisModLoader;
 
 public class GlobalCodeWrapper(UndertaleData data, string modDir, HashSet<string> replacedEntries)
 {
-    private string _configPath = $"{modDir}/global_patches.json";
+    private readonly string _configPath = Path.Combine(modDir, "global_patches.json");
     private GlobalDecompileContext _globalDecompileContext;
     private HashSet<string> _skipEntries = replacedEntries;
 

@@ -6,7 +6,7 @@ namespace vividstasisModLoader;
 
 public class StringReplacer(UndertaleData data,string modDir)
 {
-    private readonly string _excelPath = $"{modDir}/excel";
+    private readonly string _excelPath = Path.Combine(modDir, "excel");
     private readonly Dictionary<string, string> _replaceDict = new();
 
     public bool Exist()

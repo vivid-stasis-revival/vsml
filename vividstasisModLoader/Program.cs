@@ -96,7 +96,7 @@ string? GetOptionValue(string[] inputArgs, string optionName)
 string ResolveDirectoryOption(string[] inputArgs, string optionName, string defaultPath)
 {
     var value = GetOptionValue(inputArgs, optionName);
-    return Path.GetFullPath(string.IsNullOrWhiteSpace(value) ? defaultPath : value);
+    return CrossPlatformPath.GetFullPath(string.IsNullOrWhiteSpace(value) ? defaultPath : value);
 }
 
 void PrintHelp()
@@ -249,8 +249,8 @@ string SerializeModLoaderConfig(ModLoaderConfig config)
 bool IsUsableGamePath(string? gamePath)
 {
     return !string.IsNullOrWhiteSpace(gamePath)
-        && Directory.Exists(gamePath)
-        && File.Exists(Path.Combine(gamePath, "data.win"));
+        && Directory.Exists(CrossPlatformPath.NormalizeSeparators(gamePath))
+        && File.Exists(Path.Combine(CrossPlatformPath.NormalizeSeparators(gamePath), "data.win"));
 }
 
 // 从 VML 可执行文件目录创建或读取 path.json。
@@ -322,7 +322,7 @@ string ResolveGamePath(GamePathConfig pathConfig, bool allowInteractiveInput = t
             "自动检测游戏目录失败，正在使用 path.json 中的 game_path。",
             "Automatic game path detection failed; using game_path from path.json."
         );
-        return pathConfig.GamePath;
+        return CrossPlatformPath.NormalizeSeparators(pathConfig.GamePath);
     }
 
     if (!allowInteractiveInput)
@@ -353,7 +353,7 @@ string ResolveForcedCustomGamePath(GamePathConfig pathConfig)
         "path.json 已启用 force_custom_path，已绕过全部游戏目录自动获取。",
         "force_custom_path is enabled in path.json; all automatic game path discovery has been bypassed."
     );
-    return pathConfig.GamePath;
+    return CrossPlatformPath.NormalizeSeparators(pathConfig.GamePath);
 }
 
 // 在还原模式下恢复备份文件并删除备份目录。
@@ -934,7 +934,7 @@ void Run(string[] inputArgs)
         throw new ArgumentException("Missing required option: --data <path>. Use --help for usage.");
     }
 
-    var inputPath = Path.GetFullPath(inputValue);
+    var inputPath = CrossPlatformPath.GetFullPath(inputValue);
     ValidateInputPath(inputPath);
 
     var overwrite = IsOverwriteMode(inputArgs);
@@ -1012,7 +1012,7 @@ class ModLoaderConfig
 class GamePathConfig
 {
     [JsonPropertyName("game_path")]
-    public string GamePath { get; set; } = @"C:\example\path\";
+    public string GamePath { get; set; } = string.Empty;
 
     [JsonPropertyName("force_use_custom_path")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]

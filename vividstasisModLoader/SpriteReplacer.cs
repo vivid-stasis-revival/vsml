@@ -13,7 +13,7 @@ public class SpriteReplacer(UndertaleData data,string modDir)
     bool importAsSprite = true;
     Regex sprFrameRegex = new(@"^(.+?)(?:_(\d+))$", RegexOptions.Compiled);
     bool noMasksForBasicRectangles = data.IsVersionAtLeast(2022, 9);
-    private string importFolder = $"{modDir}/sprites";
+    private readonly string importFolder = Path.Combine(modDir, "sprites");
     string packDir = "./packager";
 
     public bool Exist()

@@ -5,7 +5,7 @@ namespace vividstasisModLoader;
 
 public class AudioReplacer(UndertaleData data, string gameDir, string modDir)
 {
-    readonly string _importFolder = $"{modDir}/audios";
+    readonly string _importFolder = Path.Combine(modDir, "audios");
 
     public bool Exist()
     {
@@ -145,7 +145,7 @@ public class AudioReplacer(UndertaleData data, string gameDir, string modDir)
                 {
                     relativeAudioGroupPath = $"audiogroup{audioGroupID}.dat";
                 }
-                string audioGroupPath = Path.Combine(Path.GetDirectoryName(gameDir), relativeAudioGroupPath);
+                string audioGroupPath = CrossPlatformPath.Combine(Path.GetDirectoryName(gameDir)!, relativeAudioGroupPath);
                 using (FileStream audioGroupReadStream = new(audioGroupPath, FileMode.Open, FileAccess.Read))
                 {
                     audioGroupDat = UndertaleIO.Read(audioGroupReadStream);
