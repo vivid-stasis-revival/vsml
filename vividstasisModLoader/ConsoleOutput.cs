@@ -49,6 +49,7 @@ internal static class ConsoleOutput
             "INFO" => "VML信息",
             "STEP" => "VML步骤",
             "SUCCESS" => "VML成功",
+            "NOTICE" => "VML提醒",
             "WARN" => "VML警告",
             "ERROR" => "VML错误",
             "SECTION" => "VML阶段",
@@ -119,6 +120,16 @@ internal static class ConsoleOutput
     {
         AnsiConsole.MarkupLine($"[green]成功[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
         WriteLogLine("SUCCESS", zh, en);
+    }
+
+    /// <summary>
+    /// 输出双语的提醒提示，用于结果符合预期、但值得留意一眼的情况。
+    /// 严重程度低于警告：不代表出错，只是提示实际行为可能和作者设想的不同。
+    /// </summary>
+    internal static void PrintNotice(string zh, string en)
+    {
+        AnsiConsole.MarkupLine($"[fuchsia]提醒[/][white] {EscapeMarkup(zh)}[/] [grey]({EscapeMarkup(en)})[/]");
+        WriteLogLine("NOTICE", zh, en);
     }
 
     /// <summary>
