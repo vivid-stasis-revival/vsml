@@ -1,5 +1,5 @@
 > [!CAUTION]
-> 该VSML分支旧开发者已停止维护 请前往https://github.com/vivid-stasis-revival/GamemakerUniversalModLoader获取新版
+> 该VSML分支旧开发者已停止维护 请前往 https://github.com/vivid-stasis-revival/GamemakerUniversalModLoader 获取新版
 
 ## 简介
 
