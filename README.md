@@ -1,3 +1,6 @@
+> [!CAUTION]
+> 该VSML分支旧开发者已停止维护 请前往https://github.com/vivid-stasis-revival/GamemakerUniversalModLoader获取新版
+
 ## 简介
 
 - 这个工具的原作者并不是我，我只是暂时帮忙维护这个工具。
